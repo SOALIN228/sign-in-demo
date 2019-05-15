@@ -97,6 +97,10 @@
       console.log('success')
     }, (request) => {
       let { errors } = request.responseJSON
+      if(errors.email && errors.email === 'invalid'){
+        $form.find('[name="email"]').siblings('.error')
+        .text('邮箱格式错误')
+      }
     })
   })
   </script>
