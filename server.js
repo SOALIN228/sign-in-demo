@@ -8,6 +8,8 @@ if (!port) {
   process.exit(1)
 }
 
+let sessions = {}
+
 var server = http.createServer(function (request, response) {
   var parsedUrl = url.parse(request.url, true)
   var pathWithQuery = request.url
@@ -23,11 +25,24 @@ var server = http.createServer(function (request, response) {
 
   console.log('方方说：含查询字符串的路径\n' + pathWithQuery)
 
-  if (path === '/') {
-    let string = fs.readFileSync('./index.html', 'utf8')
-    response.statusCode = 200
+  if (path === '/js/main.js') {
+    let string = fs.readFileSync('./js/main.js', 'utf8')
     response.setHeader('Content-Type', 'text/html;charset=utf-8')
-    let cookies = request.headers.cookie.split('; ')
+    response.setHeader('Cache-Control', 'max-age=30000000')
+    response.write(string)
+    response.end()
+  } else if (path === '/css/default.css') {
+    let string = fs.readFileSync('./css/default.css', 'utf8')
+    response.setHeader('Content-Type', 'text/html;charset=utf-8')
+    response.setHeader('Cache-Control', 'max-age=30000000')
+    response.write(string)
+    response.end()
+  } else if (path === '/') {
+    let string = fs.readFileSync('./index.html', 'utf8')
+    let cookies = ''
+    if (request.headers.cookie) {
+      cookies = request.headers.cookie.split('; ')
+    }
     let hash = {}
     for (let i = 0; i < cookies.length; i++) {
       let parts = cookies[i].split('=')
@@ -35,20 +50,24 @@ var server = http.createServer(function (request, response) {
       let value = parts[1]
       hash[key] = value
     }
-    let email = hash.sign_in_email
+    let mySession = sessions[hash.sessionId]
+    let email
+    if (mySession) {
+      email = mySession.sign_in_email
+    }
     let users = fs.readFileSync('./db/users', 'utf8')
     users = JSON.parse(users)
     let foundUser
-    for(let i=0; i< users.length; i++){
-      if(users[i].email === email){
+    for (let i = 0; i < users.length; i++) {
+      if (users[i].email === email) {
         foundUser = users[i]
         break
       }
     }
     console.log(foundUser)
-    if(foundUser){
+    if (foundUser) {
       string = string.replace('__password__', foundUser.password)
-    }else{
+    } else {
       string = string.replace('__password__', '不知道')
     }
     response.statusCode = 200
@@ -142,7 +161,9 @@ var server = http.createServer(function (request, response) {
         }
       }
       if (found) {
-        response.setHeader('Set-Cookie', `sign_in_email=${email}`)
+        let sessionId = Math.random() * 100000
+        sessions[sessionId] = { sign_in_email: email }
+        response.setHeader('Set-Cookie', `sessionId=${sessionId}`)
         response.statusCode = 200
       } else {
         response.statusCode = 401
